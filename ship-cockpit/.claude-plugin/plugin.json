@@ -5,5 +5,8 @@
   "types": "./types/index.d.ts",
   "author": {
     "name": "hansraj"
-  }
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/ship-cockpit",
+  "repository": "https://github.com/hansraj316/hansraj-mods"
 }

@@ -15,6 +15,14 @@ A Claude Code mod for the commit → PR → merge → deploy loop.
 - **`/ship go`**: asks Claude to test, commit, open a PR, wait for checks, merge, deploy (with the guard's confirmation) and smoke-test.
 - **Status line**: `⛵ branch · N uncommitted · PR #n checks`.
 
+## What the mod runs, reads and sends
+
+- **Programs it runs**: `git` (branch, HEAD, status, ahead/behind counts) and `gh` (`gh pr view`, `gh issue list`) in the current folder, to fill the pane and status line. Nothing else is started.
+- **Files it reads**: when a command would write to a database, it reads the env files that command names, or `.env.local` and `.env` in the target folder, and the `DATABASE_URL` and `HOME` environment variables. It only parses the database **hostname** out of them to decide whether the target is production. Credentials in those files are never stored, shown or sent anywhere.
+- **What it stores**: database host marks (safe/prod) and the last 20 production deploys, in the plugin's own local store on your machine.
+- **What it sends out**: nothing. The mod makes no network calls of its own. `/ship go` submits a fixed prompt to Claude (the shipping checklist above) and nothing from your files or conversation is put into it.
+- **Hooks**: it hooks every `Bash` tool call to classify it (deploy, data change, force-push) and either lets it through, asks you, or refuses it. It never rewrites the command.
+
 Mods are advisory, not a security boundary. For hard blocks, also add permission rules (e.g. `"deny": ["Bash(vercel deploy --prod:*)"]`) in settings.
 
 ## Install

@@ -176,7 +176,7 @@ async function dbCommand($: EngineInterface, args: string[], isPerson: boolean):
   const marks = await dbMarks($)
   if (!action) {
     const { dir, targets, risky } = await judgeDb($, 'npx drizzle-kit push')
-    const listed = Object.entries(marks).map(([h, m]) => `  ${m.padEnd(4)} ${h}`)
+    const listed = Object.entries(marks).map(([name, mark]) => `  ${mark.padEnd(4)} ${name}`)
     return [
       `Databases a migration in ${dir} would reach: ${targets.join(', ') || 'none found'}`,
       risky ? `  → blocked: ${risky.host} (${risky.why})` : '  → allowed',

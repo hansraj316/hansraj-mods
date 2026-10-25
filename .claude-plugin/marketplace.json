@@ -1,0 +1,9 @@
+{
+  "name": "hansraj-mods",
+  "description": "Hansraj's Claude Code mods",
+  "owner": { "name": "hansraj" },
+  "plugins": [
+    { "name": "ship-cockpit", "source": "./ship-cockpit" },
+    { "name": "dictation-cleaner", "source": "./dictation-cleaner" }
+  ]
+}

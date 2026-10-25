@@ -1,0 +1,6 @@
+{
+  "name": "dictation-cleaner",
+  "version": "0.1.0",
+  "description": "Strips filler words, stutters and your usual typos from dictated prompts before Claude reads them.",
+  "author": { "name": "hansraj" }
+}

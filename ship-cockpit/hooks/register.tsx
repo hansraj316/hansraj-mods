@@ -1,9 +1,12 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { ShipDeploy, ShipPr, ShipSnapshot } from '../types'
+import type { FleetProject, ShipDeploy, ShipPr, ShipSnapshot, ShipTab } from '../types'
 import { cdTarget, envFilesIn, hostsIn, isDbMutation, isProdEnvFile, riskyHost } from './db'
 import type { HostMark, HostVerdict } from './db'
+import { C, T, checksColor, checksPercent, dotSvg, progressSvg, ringSvg, sparkSvg } from './draw'
+import { FLEET_KEY, LEVEL_WORD, eventOf, expandHome, fleetPaths, levelOf, nameOf, readProject, sortFleet } from './fleet'
+import type { FleetLevel } from './fleet'
 import { classify, touchesShipState } from './rules'
 
 const PANE = 'ship'
@@ -16,6 +19,70 @@ const snapshot = atom({ plugin: 'ship-cockpit', key: 'snapshot' } as const, {
   behind: 0,
   issues: [],
 } as ShipSnapshot)
+const fleet = atom({ plugin: 'ship-cockpit', key: 'fleet' } as const, [] as FleetProject[], { shape: 'fleet-1' })
+const tab = atom({ plugin: 'ship-cockpit', key: 'tab' } as const, 'ship' as ShipTab)
+const tickerIndex = atom({ plugin: 'ship-cockpit', key: 'tickerIndex' } as const, 0)
+const tickerPaused = atom({ plugin: 'ship-cockpit', key: 'tickerPaused' } as const, false)
+
+const LEVEL_COLOR: Record<FleetLevel, { fill: string; text: string; term: string }> = {
+  failing: { fill: C.red, text: T.red, term: 'error' },
+  attention: { fill: C.amber, text: T.amber, term: 'warning' },
+  healthy: { fill: C.green, text: T.green, term: 'success' },
+  quiet: { fill: C.blue, text: T.blue, term: 'subtle' },
+}
+
+/** Re-reads every project on the fleet list, a few at a time. */
+async function refreshFleet($: EngineInterface): Promise<void> {
+  const paths = await fleetPaths($)
+  const out: FleetProject[] = []
+  for (let i = 0; i < paths.length; i += 3) {
+    const batch = await Promise.all(paths.slice(i, i + 3).map(p => readProject($, p)))
+    out.push(...batch)
+  }
+  await update($, fleet, () => out)
+}
+
+async function fleetCommand($: EngineInterface, args: string[]): Promise<string> {
+  const [action, ...rest] = args
+  const paths = await fleetPaths($)
+  const home = (await $.env.get('HOME')) ?? ''
+  if (action === 'add') {
+    const raw = rest.join(' ').trim() || (await $.session.cwd())
+    const cwd = await $.session.cwd()
+    const path = expandHome(raw.startsWith('/') || raw.startsWith('~') ? raw : `${cwd}/${raw}`, home)
+    if (paths.includes(path)) return `${nameOf(path)} is already on the fleet.`
+    const next = [...paths, path].slice(0, 12)
+    await $.store.set(FLEET_KEY, next)
+    void refreshFleet($)
+    return `Added ${nameOf(path)} to the fleet (${next.length} project${next.length === 1 ? '' : 's'}).`
+  }
+  if (action === 'remove') {
+    const target = rest.join(' ').trim()
+    const next = paths.filter(p => p !== expandHome(target, home) && nameOf(p) !== target)
+    if (next.length === paths.length) return `No fleet project matches "${target}".`
+    await $.store.set(FLEET_KEY, next)
+    await update($, fleet, list => list.filter(p => next.includes(p.path)))
+    return `Removed ${target} from the fleet.`
+  }
+  await update($, tab, () => 'fleet' as ShipTab)
+  await $.ui.open({ id: PANE, title: 'Ship' })
+  void refreshFleet($)
+  if (paths.length === 0) return 'The fleet is empty. Add a project with /ship fleet add <path> (or no path for this folder).'
+  return `Fleet: ${paths.map(nameOf).join(', ')}`
+}
+
+async function shipWithConfirm($: EngineInterface): Promise<void> {
+  let answer = 'Cancel'
+  try {
+    answer = await $.ui.ask('Ship the current work? Claude will test, commit, open a PR, merge when checks pass, and ask you before deploying to production.', {
+      header: 'Ship',
+      options: ['Cancel', 'Ship it'],
+    })
+  } catch {
+    return
+  }
+  if (answer === 'Ship it') await $.prompt.submit({ text: SHIP_PROMPT, asUser: true })
+}
 
 const SHIP_PROMPT = `Ship the current work, stopping at the first failure and telling me why:
 1. Run the project's tests and lint.
@@ -202,11 +269,23 @@ export const register: Register = on => {
     const started = await next(e)
     await $.command.register({
       name: 'ship',
-      description: 'Ship cockpit: open the pane, or `/ship go` to test, PR, merge and deploy',
-      argumentHint: '[go | db [safe|prod|forget] <host>]',
+      description: 'Ship cockpit: open the pane, `/ship go` to test, PR, merge and deploy, `/ship fleet` for your other projects',
+      argumentHint: '[go | fleet [add|remove] <path> | db [safe|prod|forget] <host>]',
     })
     // Headless runs (claude -p, the SDK) keep the guard and nothing else.
     if (!e.isInteractive) return started
+    // Fleet: your other projects, read every 3 minutes; the ticker turns every 5 seconds.
+    void (async () => {
+      if ((await fleetPaths($)).length === 0) return
+      await refreshFleet($)
+    })()
+    $.clock.every(3 * 60_000, () => void refreshFleet($))
+    $.clock.every(5000, () => {
+      void (async () => {
+        const count = (await read($, fleet)).length
+        if (count > 1 && !(await read($, tickerPaused))) await update($, tickerIndex, i => (i + 1) % count)
+      })()
+    })
     void (async () => {
       if (!(await git($, 'rev-parse', '--is-inside-work-tree'))) return
       isWatching = true
@@ -222,11 +301,13 @@ export const register: Register = on => {
     const arg = e.args.trim()
     const words = arg.split(/\s+/)
     if (words[0] === 'db') return { text: await dbCommand($, words.slice(1), e.origin.kind === 'composer') }
+    if (words[0] === 'fleet') return { text: await fleetCommand($, words.slice(1)) }
     if (arg === 'go') {
       await $.prompt.submit({ text: SHIP_PROMPT, asUser: true })
       return { text: 'Shipping: tests → PR → merge → deploy. You will be asked before production.' }
     }
     await refresh($)
+    await update($, tab, () => 'ship' as ShipTab)
     await $.ui.open({ id: PANE, title: 'Ship' })
     return { text: statusLine(await read($, snapshot)) }
   })
@@ -267,45 +348,258 @@ export const register: Register = on => {
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'ship-cockpit: its guard failed, so the command was not run.' }))
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
-    const s = await read($, snapshot)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const current = await read($, tab)
+    const tabs = (
+      <Box flexDirection="row" gap="xs">
+        <Button key="tab-ship" label="Ship" variant={current === 'ship' ? 'primary' : 'secondary'} onPress={() => update($, tab, () => 'ship' as ShipTab)} />
+        <Button
+          key="tab-fleet"
+          label="Fleet"
+          variant={current === 'fleet' ? 'primary' : 'secondary'}
+          onPress={async () => {
+            await update($, tab, () => 'fleet' as ShipTab)
+            void refreshFleet($)
+          }}
+        />
+      </Box>
+    )
     const width = Math.max(20, e.props.bodyColumns)
     const cut = (text: string) => (text.length > width ? text.slice(0, width - 1) + '…' : text)
-    if (!s.updatedAt) return <Text dimColor>Loading…</Text>
-    if (!s.branch) return <Text dimColor>{s.error ?? 'No git repository here.'}</Text>
-    const checkColor = s.pr?.checks === 'passing' ? 'green' : s.pr?.checks === 'failing' ? 'red' : 'yellow'
-    return (
-      <Box flexDirection="column">
-        <Text bold>{cut(`⎇ ${s.branch} @ ${s.head}`)}</Text>
-        <Text dimColor={!s.dirty && !s.ahead && !s.behind} color={s.dirty ? 'yellow' : undefined}>
-          {cut(`${s.dirty} uncommitted · ↑${s.ahead} ↓${s.behind}`)}
-        </Text>
-        <Text> </Text>
-        <Text bold>Pull request</Text>
-        {s.pr ? (
+
+    if (current === 'fleet') {
+      const list = sortFleet(await read($, fleet))
+      const count = (l: FleetLevel) => list.filter(p => levelOf(p) === l).length
+      if (e.surface === 'terminal') {
+        return (
           <Box flexDirection="column">
-            <Text>{cut(`#${s.pr.number} ${s.pr.title}`)}</Text>
-            <Text color={checkColor}>{`${s.pr.state.toLowerCase()} · checks ${s.pr.checks}`}</Text>
+            {tabs}
+            {list.length === 0 && <Text dimColor>No projects yet. /ship fleet add &lt;path&gt;</Text>}
+            {list.map(p => {
+              const level = levelOf(p)
+              const ev = eventOf(p)
+              return (
+                <Box flexDirection="column">
+                  <Text bold color={LEVEL_COLOR[level].term}>{cut(`● ${p.name} · ${LEVEL_WORD[level]}`)}</Text>
+                  <Text dimColor>{cut(`  ${ev.text}${ev.at ? ` · ${ago(ev.at)}` : ''}${p.milestone ? ` · ${p.milestone.title} ${p.milestone.percent}%` : ''}`)}</Text>
+                </Box>
+              )
+            })}
           </Box>
-        ) : (
-          <Text dimColor>none for this branch</Text>
-        )}
-        <Text> </Text>
-        <Text bold>Production</Text>
-        {s.lastDeploy ? (
-          <Text>{cut(`${s.lastDeploy.branch}@${s.lastDeploy.head} · ${ago(s.lastDeploy.at)}`)}</Text>
-        ) : (
-          <Text dimColor>no deploy recorded yet</Text>
-        )}
-        <Text dimColor>guarded: asks before deploy</Text>
-        <Text> </Text>
-        <Text bold>Open issues</Text>
-        {s.issues.length === 0 && <Text dimColor>none</Text>}
-        {s.issues.map(issue => (
-          <Text>{cut(`#${issue.number} ${issue.title} · ${ago(Date.parse(issue.updatedAt))}`)}</Text>
-        ))}
-        <Text> </Text>
-        <Text dimColor>{cut(`updated ${ago(s.updatedAt)} · /ship go to ship`)}</Text>
+        )
+      }
+      const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+      const barW = Math.max(120, Math.min(300, width * 7))
+      return (
+        <Box flexDirection="column" gap="md">
+          {tabs}
+          <Box flexDirection="row" gap="lg">
+            {(['failing', 'attention', 'healthy'] as FleetLevel[]).map(l => (
+              <Box flexDirection="column">
+                <Text size="heading" weight="semibold" tabular color={LEVEL_COLOR[l].text}>
+                  {String(count(l))}
+                </Text>
+                <Text size="caption" dimColor>
+                  {LEVEL_WORD[l]}
+                </Text>
+              </Box>
+            ))}
+          </Box>
+          {list.length === 0 && <Text dimColor>No projects yet. Type /ship fleet add followed by a folder, or no folder for this one.</Text>}
+          {list.map(p => {
+            const level = levelOf(p)
+            const ev = eventOf(p)
+            return (
+              <Box key={`p-${p.path}`} flexDirection="column" gap="xs" paddingY="xs">
+                <Box flexDirection="row" alignItems="center" gap="sm">
+                  <Svg source={dotSvg(LEVEL_COLOR[level].fill)} alt="" width={8} height={8} />
+                  <Text weight="semibold" wrap="truncate">{p.name}</Text>
+                  <Box flexGrow={1} />
+                  <Text size="footnote" weight="semibold" color={LEVEL_COLOR[level].text}>
+                    {LEVEL_WORD[level]}
+                  </Text>
+                </Box>
+                <Text size="footnote" wrap="truncate">{ev.text}</Text>
+                {p.milestone && (
+                  <Box flexDirection="row" alignItems="center" gap="sm">
+                    <Svg source={progressSvg(p.milestone.percent, LEVEL_COLOR[level].fill, barW)} alt={`${p.milestone.title} ${p.milestone.percent}% done`} width={barW} height={6} />
+                    <Text size="footnote" dimColor tabular>{`${p.milestone.percent}%`}</Text>
+                  </Box>
+                )}
+                <Box flexDirection="row" alignItems="center" gap="sm">
+                  <Text size="footnote" dimColor wrap="truncate">{p.milestone?.title ?? p.branch ?? ''}</Text>
+                  <Box flexGrow={1} />
+                  <Svg source={sparkSvg(p.activity)} alt={`Commits in the last 7 days: ${p.activity.join(', ')}`} width={34} height={14} />
+                  <Text size="footnote" dimColor>{ev.at ? ago(ev.at) : ''}</Text>
+                </Box>
+              </Box>
+            )
+          })}
+          <Text size="footnote" dimColor>From git and GitHub every 3 minutes · /ship fleet add or remove</Text>
+        </Box>
+      )
+    }
+
+    const s = await read($, snapshot)
+    if (!s.updatedAt) return <Box flexDirection="column">{tabs}<Text dimColor>Loading…</Text></Box>
+    if (!s.branch) return <Box flexDirection="column">{tabs}<Text dimColor>{s.error ?? 'No git repository here.'}</Text></Box>
+
+    if (e.surface === 'terminal') {
+      const checkColor = s.pr?.checks === 'passing' ? 'green' : s.pr?.checks === 'failing' ? 'red' : 'yellow'
+      return (
+        <Box flexDirection="column">
+          {tabs}
+          <Text bold>{cut(`⎇ ${s.branch} @ ${s.head}`)}</Text>
+          <Text dimColor={!s.dirty && !s.ahead && !s.behind} color={s.dirty ? 'yellow' : undefined}>
+            {cut(`${s.dirty} uncommitted · ↑${s.ahead} ↓${s.behind}`)}
+          </Text>
+          <Text> </Text>
+          <Text bold>Pull request</Text>
+          {s.pr ? (
+            <Box flexDirection="column">
+              <Text>{cut(`#${s.pr.number} ${s.pr.title}`)}</Text>
+              <Text color={checkColor}>{`${s.pr.state.toLowerCase()} · checks ${s.pr.checks}`}</Text>
+            </Box>
+          ) : (
+            <Text dimColor>none for this branch</Text>
+          )}
+          <Text> </Text>
+          <Text bold>Production</Text>
+          {s.lastDeploy ? (
+            <Text>{cut(`${s.lastDeploy.branch}@${s.lastDeploy.head} · ${ago(s.lastDeploy.at)}`)}</Text>
+          ) : (
+            <Text dimColor>no deploy recorded yet</Text>
+          )}
+          <Text dimColor>guarded: asks before deploy</Text>
+          <Text> </Text>
+          <Text bold>Open issues</Text>
+          {s.issues.length === 0 && <Text dimColor>none</Text>}
+          {s.issues.map(issue => (
+            <Text>{cut(`#${issue.number} ${issue.title} · ${ago(Date.parse(issue.updatedAt))}`)}</Text>
+          ))}
+          <Text> </Text>
+          <Text dimColor>{cut(`updated ${ago(s.updatedAt)} · /ship go to ship`)}</Text>
+        </Box>
+      )
+    }
+
+    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    const checks = checksColor(s.pr?.checks)
+    return (
+      <Box flexDirection="column" gap="md">
+        {tabs}
+        <Box flexDirection="column" gap="xs">
+          <Box flexDirection="row" alignItems="center">
+            <Text size="caption" weight="semibold" dimColor>
+              BRANCH
+            </Text>
+            <Box flexGrow={1} />
+            <Text size="footnote" mono dimColor>{`HEAD ${s.head ?? ''}`}</Text>
+          </Box>
+          <Text mono weight="semibold" wrap="truncate">{s.branch}</Text>
+          <Box flexDirection="row" gap="sm" flexWrap="wrap">
+            <Text size="footnote" weight="semibold" color={s.dirty ? T.amber : T.gray}>{`${s.dirty} uncommitted`}</Text>
+            <Text size="footnote" dimColor>{`${s.ahead} ahead`}</Text>
+            <Text size="footnote" dimColor>{`${s.behind} behind`}</Text>
+          </Box>
+        </Box>
+        <Box flexDirection="row" alignItems="center" gap="sm">
+          <Svg source={ringSvg(checksPercent(s.pr?.checks), checks.fill)} alt={s.pr ? `Checks ${s.pr.checks}` : 'No pull request'} width={36} height={36} />
+          <Box flexDirection="column" flexGrow={1}>
+            <Text size="caption" weight="semibold" dimColor>
+              PULL REQUEST
+            </Text>
+            <Text weight="semibold" wrap="truncate">{s.pr ? `#${s.pr.number} ${s.pr.title}` : 'None for this branch'}</Text>
+          </Box>
+          {s.pr && (
+            <Text size="footnote" weight="semibold" color={checks.text}>
+              {s.pr.checks === 'passing' ? 'All passed' : s.pr.checks === 'failing' ? 'Failing' : s.pr.checks === 'pending' ? 'Running' : 'No checks'}
+            </Text>
+          )}
+        </Box>
+        <Box flexDirection="row" alignItems="center" gap="sm">
+          <Svg source={dotSvg(s.lastDeploy ? C.green : C.gray, 10)} alt="" width={10} height={10} />
+          <Box flexDirection="column" flexGrow={1}>
+            <Text size="caption" weight="semibold" dimColor>
+              LAST PRODUCTION DEPLOY
+            </Text>
+            <Text size="footnote" wrap="truncate">{s.lastDeploy ? `${s.lastDeploy.branch}@${s.lastDeploy.head} · ${ago(s.lastDeploy.at)}` : 'None recorded yet · asks before every deploy'}</Text>
+          </Box>
+        </Box>
+        <Box flexDirection="column" gap="xs">
+          <Text size="caption" weight="semibold" dimColor>
+            OPEN ISSUES
+          </Text>
+          {s.issues.length === 0 && <Text size="footnote" dimColor>None open</Text>}
+          {s.issues.map(issue => (
+            <Box flexDirection="row" gap="sm">
+              <Text size="footnote" dimColor tabular>{`#${issue.number}`}</Text>
+              <Text size="footnote" wrap="truncate">{issue.title}</Text>
+              <Box flexGrow={1} />
+              <Text size="footnote" dimColor>{ago(Date.parse(issue.updatedAt))}</Text>
+            </Box>
+          ))}
+        </Box>
+        <Box flexDirection="row" gap="sm" alignItems="center">
+          <Text size="footnote" dimColor>{`Updated ${ago(s.updatedAt)}`}</Text>
+          <Box flexGrow={1} />
+          <Button key="refresh" label="Refresh" onPress={() => refresh($)} />
+          <Button key="ship-it" variant="primary" label="Ship it" onPress={() => shipWithConfirm($)} />
+        </Box>
+      </Box>
+    )
+  })
+
+  // Fleet ticker: one line above the prompt that turns through your other projects. Click to pause.
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const below = await next(e)
+    if (e.props.hasSurvey) return below
+    const list = sortFleet(await read($, fleet))
+    if (list.length === 0) return below
+    const paused = await read($, tickerPaused)
+    const p = list[(await read($, tickerIndex)) % list.length] ?? list[0]
+    if (!p) return below
+    const level = levelOf(p)
+    const ev = eventOf(p)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const toggle = () => update($, tickerPaused, x => !x)
+    const open = async () => {
+      await update($, tab, () => 'fleet' as ShipTab)
+      await $.ui.open({ id: PANE, title: 'Ship' })
+    }
+    const when = ev.at ? ` · ${ago(ev.at)}` : ''
+
+    if (e.surface === 'terminal') {
+      return (
+        <Box flexDirection="column">
+          <Box flexDirection="row" gap={1}>
+            <Text color={paused ? 'subtle' : 'success'}>{paused ? 'paused' : 'live'}</Text>
+            <Text color={LEVEL_COLOR[level].term}>●</Text>
+            <Text bold>{p.name}</Text>
+            <Text dimColor wrap="truncate">{`${ev.text}${when}`}</Text>
+            <Button key="ticker" label={paused ? 'Resume' : 'Pause'} onPress={toggle} />
+          </Box>
+          {below}
+        </Box>
+      )
+    }
+
+    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    return (
+      <Box flexDirection="column" gap="xs">
+        <Box key="fleet-ticker" flexDirection="row" alignItems="center" gap="sm">
+          <Svg source={dotSvg(paused ? C.gray : C.green, 6)} alt="" width={6} height={6} />
+          <Text size="caption" weight="bold" color={paused ? T.gray : T.green}>
+            {paused ? 'PAUSED' : 'LIVE'}
+          </Text>
+          <Svg source={dotSvg(LEVEL_COLOR[level].fill)} alt={LEVEL_WORD[level]} width={8} height={8} />
+          <Button key="ticker" plain label={p.name} onPress={open} />
+          <Text dimColor wrap="truncate">{`${ev.text}${when}`}</Text>
+          <Box flexGrow={1} />
+          <Text size="caption" dimColor tabular>{`${(list.indexOf(p) + 1)}/${list.length}`}</Text>
+          <Button key="ticker-pause" plain dimColor label={paused ? 'Resume' : 'Pause'} onPress={toggle} />
+        </Box>
+        {below}
       </Box>
     )
   })

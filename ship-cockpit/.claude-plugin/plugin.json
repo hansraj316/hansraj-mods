@@ -1,7 +1,7 @@
 {
   "name": "ship-cockpit",
-  "version": "0.2.0",
-  "description": "Guards production deploys and production data, and shows branch, PR, CI and issues in a pane.",
+  "version": "0.3.0",
+  "description": "Guards production deploys and production data, shows branch, PR, CI and issues in a Desktop-styled pane, and keeps a live Fleet ticker of your other projects.",
   "types": "./types/index.d.ts",
   "author": {
     "name": "hansraj"

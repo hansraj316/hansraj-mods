@@ -1,0 +1,36 @@
+{
+  "name": "context-halo",
+  "version": "0.1.0",
+  "description": "Context window usage you can read at a glance: a halo above the prompt, a Rings pane, prompt-cache countdown, and a heads-up before auto-compact.",
+  "author": {
+    "name": "hansraj"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/context-halo",
+  "repository": "https://github.com/hansraj316/hansraj-mods",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "cacheTtl": {
+      "type": "string",
+      "title": "Prompt cache lifetime",
+      "description": "How long the prompt cache stays warm after a reply: 5m on most plans, 1h when your account uses the long cache.",
+      "default": "5m",
+      "options": [
+        "5m",
+        "1h"
+      ]
+    },
+    "warnAt": {
+      "type": "number",
+      "title": "Heads-up at (%)",
+      "description": "Show a toast once when context passes this percentage.",
+      "default": 80
+    },
+    "criticalAt": {
+      "type": "number",
+      "title": "Critical at (%)",
+      "description": "Turn the halo red, show a Compact button and toast once at this percentage.",
+      "default": 92
+    }
+  }
+}

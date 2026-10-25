@@ -42,8 +42,9 @@ async function refreshFleet($: EngineInterface): Promise<void> {
   await update($, fleet, () => out)
 }
 
-async function fleetCommand($: EngineInterface, args: string[]): Promise<string> {
+async function fleetCommand($: EngineInterface, args: string[], isPerson: boolean): Promise<string> {
   const [action, ...rest] = args
+  if ((action === 'add' || action === 'remove') && !isPerson) return 'Only you, typing at the prompt, can add or remove fleet projects.'
   const paths = await fleetPaths($)
   const home = (await $.env.get('HOME')) ?? ''
   if (action === 'add') {
@@ -300,8 +301,8 @@ export const register: Register = on => {
   on('command.run', { command: 'ship' }, async ($, e) => {
     const arg = e.args.trim()
     const words = arg.split(/\s+/)
-    if (words[0] === 'db') return { text: await dbCommand($, words.slice(1), e.origin.kind === 'composer') }
-    if (words[0] === 'fleet') return { text: await fleetCommand($, words.slice(1)) }
+    if (words[0] === 'db') return { text: await dbCommand($, words.slice(1), e.origin?.kind === 'composer') }
+    if (words[0] === 'fleet') return { text: await fleetCommand($, words.slice(1), e.origin?.kind === 'composer') }
     if (arg === 'go') {
       await $.prompt.submit({ text: SHIP_PROMPT, asUser: true })
       return { text: 'Shipping: tests → PR → merge → deploy. You will be asked before production.' }
@@ -388,7 +389,7 @@ export const register: Register = on => {
           </Box>
         )
       }
-      const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+      const { Svg } = $.ui.resolve(e)
       const barW = Math.max(120, Math.min(300, width * 7))
       return (
         <Box flexDirection="column" gap="md">
@@ -483,7 +484,7 @@ export const register: Register = on => {
       )
     }
 
-    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    const { Svg } = $.ui.resolve(e)
     const checks = checksColor(s.pr?.checks)
     return (
       <Box flexDirection="column" gap="md">
@@ -584,7 +585,7 @@ export const register: Register = on => {
       )
     }
 
-    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    const { Svg } = $.ui.resolve(e)
     return (
       <Box flexDirection="column" gap="xs">
         <Box key="fleet-ticker" flexDirection="row" alignItems="center" gap="sm">

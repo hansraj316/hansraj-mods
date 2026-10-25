@@ -230,7 +230,7 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    const { Svg } = $.ui.resolve(e)
     const color = COLORS[v.level]
     const bar = barSvg(v.slices.map(s => ({ value: s.tokens, color: s.color })), 96, 6)
     return (
@@ -320,7 +320,7 @@ export const register: Register = (on, options) => {
       )
     }
 
-    const { Svg } = $.ui.resolve(e as typeof e & { surface: 'desktop' })
+    const { Svg } = $.ui.resolve(e)
     const width = Math.max(160, Math.min(320, e.props.bodyColumns * 8))
     return (
       <Box flexDirection="column" gap="md">

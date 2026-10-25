@@ -45,7 +45,7 @@ const PANE = {
 
 const ok = (stdout: string) => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } })
 
-test('/ship fleet add reads the project, and the ticker and Fleet tab show it on every surface', async ($, on) => {
+test('fleet changes need the person; the ticker and Fleet tab show a listed project on every surface', async ($, on) => {
   const store = new Map<string, unknown>()
   on('store.get', (_, e) => ({ value: store.get(String(e.key)) }))
   on('store.set', (_, e) => {
@@ -73,9 +73,11 @@ test('/ship fleet add reads the project, and the ticker and Fleet tab show it on
   })
   on('command.run', () => ({ text: '' }))
 
-  const added = await $.command.run({ command: 'ship', args: 'fleet add ~/projects/example-app' })
-  expect(String(added.text)).toContain('Added example-app')
-  expect(store.get('fleetPaths')).toEqual(['/Users/me/projects/example-app'])
+  // Only the person at the prompt may change the fleet; a plugin's run (as this test's is) is refused.
+  const refused = await $.command.run({ command: 'ship', args: 'fleet add ~/projects/example-app' })
+  expect(String(refused.text)).toContain('Only you')
+  expect(store.get('fleetPaths')).toBeUndefined()
+  store.set('fleetPaths', ['/Users/me/projects/example-app'])
   // Opening the Fleet tab reads every project again; wait for that read.
   await $.command.run({ command: 'ship', args: 'fleet' })
 

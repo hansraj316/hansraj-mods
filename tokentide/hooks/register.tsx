@@ -22,17 +22,17 @@ import {
 } from './model'
 import type { Pressure } from './model'
 
-const PANE = 'halo'
+const PANE = 'tide'
 const DEFAULT_COMPACT_AT = 92
 
-const usage = atom({ plugin: 'context-halo', key: 'usage' } as const, { window: 200_000, limits: [], at: 0 } as HaloUsage, { shape: 'usage-1' })
-const growth = atom({ plugin: 'context-halo', key: 'growth' } as const, [] as number[], { shape: 'growth-1' })
-const breakdown = atom({ plugin: 'context-halo', key: 'breakdown' } as const, { slices: [] } as HaloBreakdown, { shape: 'breakdown-1' })
-const cache = atom({ plugin: 'context-halo', key: 'cache' } as const, { lastAt: 0 } as HaloCache, { shape: 'cache-1' })
-const expanded = atom({ plugin: 'context-halo', key: 'expanded' } as const, false)
-const tab = atom({ plugin: 'context-halo', key: 'tab' } as const, 'now' as HaloTab)
-const now = atom({ plugin: 'context-halo', key: 'now' } as const, 0)
-const alerted = atom({ plugin: 'context-halo', key: 'alerted' } as const, 0)
+const usage = atom({ plugin: 'tokentide', key: 'usage' } as const, { window: 200_000, limits: [], at: 0 } as HaloUsage, { shape: 'usage-1' })
+const growth = atom({ plugin: 'tokentide', key: 'growth' } as const, [] as number[], { shape: 'growth-1' })
+const breakdown = atom({ plugin: 'tokentide', key: 'breakdown' } as const, { slices: [] } as HaloBreakdown, { shape: 'breakdown-1' })
+const cache = atom({ plugin: 'tokentide', key: 'cache' } as const, { lastAt: 0 } as HaloCache, { shape: 'cache-1' })
+const expanded = atom({ plugin: 'tokentide', key: 'expanded' } as const, false)
+const tab = atom({ plugin: 'tokentide', key: 'tab' } as const, 'now' as HaloTab)
+const now = atom({ plugin: 'tokentide', key: 'now' } as const, 0)
+const alerted = atom({ plugin: 'tokentide', key: 'alerted' } as const, 0)
 
 type View = {
   percent: number
@@ -131,8 +131,8 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const started = await next(e)
     await $.command.register({
-      name: 'halo',
-      description: 'Context halo: open the Rings pane, or `/halo compact` to compact now',
+      name: 'tide',
+      description: 'TokenTide: open the Rings pane, or `/tide compact` to compact now',
       argumentHint: '[compact]',
     })
     try {
@@ -157,10 +157,10 @@ export const register: Register = (on, options) => {
     return started
   })
 
-  on('command.run', { command: 'halo' }, async ($, e) => {
+  on('command.run', { command: 'tide' }, async ($, e) => {
     if (e.args.trim() === 'compact') {
       await compactWithConfirm($)
-      return { text: 'Context halo: compact handled.' }
+      return { text: 'TokenTide: compact handled.' }
     }
     await $.ui.open({ id: PANE, title: 'Context' })
     const u = await read($, usage)
@@ -177,7 +177,7 @@ export const register: Register = (on, options) => {
         const left = turnsLeft(await read($, growth), pct, (await read($, breakdown)).compactAt ?? DEFAULT_COMPACT_AT)
         if (pct >= criticalAt && was < criticalAt) {
           await update($, alerted, () => criticalAt)
-          $.ui.toast(`Context ${pct}% full: ${turnsText(left)}. Type /halo compact to compact now.`, { timeoutMs: 8000 })
+          $.ui.toast(`Context ${pct}% full: ${turnsText(left)}. Type /tide compact to compact now.`, { timeoutMs: 8000 })
         } else if (pct >= warnAt && was < warnAt) {
           await update($, alerted, () => warnAt)
           const biggest = (await read($, breakdown)).slices[0]

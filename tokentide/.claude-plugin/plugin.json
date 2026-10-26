@@ -1,12 +1,13 @@
 {
-  "name": "context-halo",
+  "name": "tokentide",
+  "displayName": "TokenTide",
   "version": "0.1.0",
-  "description": "Context window usage you can read at a glance: a halo above the prompt, a Rings pane, prompt-cache countdown, and a heads-up before auto-compact.",
+  "description": "Watch the token tide rise: a ring above the prompt, a Rings pane, a prompt-cache countdown and a heads-up before auto-compact.",
   "author": {
     "name": "hansraj"
   },
   "license": "MIT",
-  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/context-halo",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/tokentide",
   "repository": "https://github.com/hansraj316/hansraj-mods",
   "types": "./types/index.d.ts",
   "userConfig": {
@@ -29,7 +30,7 @@
     "criticalAt": {
       "type": "number",
       "title": "Critical at (%)",
-      "description": "Turn the halo red, show a Compact button and toast once at this percentage.",
+      "description": "Turn the ring red, show a Compact button and toast once at this percentage.",
       "default": 92
     }
   }

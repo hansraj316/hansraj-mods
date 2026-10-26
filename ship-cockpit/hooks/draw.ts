@@ -1,4 +1,4 @@
-// SVG pieces for the graphical surfaces (Desktop, VS Code, mobile), in the same palette as context-halo.
+// SVG pieces for the graphical surfaces (Desktop, VS Code, mobile), in the same palette as tokentide.
 
 export const C = {
   green: '#30D158',

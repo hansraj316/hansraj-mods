@@ -3,7 +3,7 @@ import { expect, test } from 'claude-code/testing'
 import { cacheText, pressure, pushGrowth, turnsLeft } from './model'
 
 const BAND = {
-  plugin: 'context-halo',
+  plugin: 'tokentide',
   component: 'AbovePrompt',
   requestId: 'band',
   props: {
@@ -17,9 +17,9 @@ const BAND = {
 } as const
 
 const PANE = {
-  plugin: 'context-halo',
+  plugin: 'tokentide',
   component: 'Pane',
-  requestId: 'halo',
+  requestId: 'tide',
   props: {
     title: 'Context',
     isFocused: false,
@@ -51,7 +51,7 @@ test('the model: pressure, growth, turns left and cache', () => {
   expect(cacheText(1000, 400_000, 300_000, false)).toBe('cold')
 })
 
-test('the halo shows the fill on every surface, and nothing before a reply', async ($, on) => {
+test('the ring shows the fill on every surface, and nothing before a reply', async ($, on) => {
   on('clock.now', () => ({ value: 1_000_000 }))
   on('session.measure', (_, e) => ({ changed: e.changed }))
   on('ui.render', ($, e) => {
@@ -93,7 +93,7 @@ test('one toast at the heads-up line and one at critical', async ($, on) => {
   expect(toasts[0]).toMatch(/Context 81% full/)
   await $.session.measure(measure(93))
   expect(toasts.length).toBe(2)
-  expect(toasts[1]).toMatch(/\/halo compact/)
+  expect(toasts[1]).toMatch(/\/tide compact/)
 })
 
 test('Compact asks first, and compacts only on yes', async ($, on) => {

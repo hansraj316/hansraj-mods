@@ -14,8 +14,8 @@
       "source": "./dictation-cleaner"
     },
     {
-      "name": "context-halo",
-      "source": "./context-halo"
+      "name": "tokentide",
+      "source": "./tokentide"
     }
   ]
 }

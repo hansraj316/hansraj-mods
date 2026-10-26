@@ -30,7 +30,7 @@ export type HaloTab = 'now' | 'turns'
 
 declare module 'claude-code' {
   interface PluginState {
-    'context-halo': {
+    'tokentide': {
       usage: Shaped<HaloUsage>
       growth: Shaped<number[]>
       breakdown: Shaped<HaloBreakdown>

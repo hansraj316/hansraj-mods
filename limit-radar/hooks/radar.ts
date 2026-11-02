@@ -52,15 +52,20 @@ export function forecast(log: RadarLog, now: number): Forecast | undefined {
   return { limitAt, isBeforeReset: Number.isNaN(reset) ? false : limitAt < reset }
 }
 
-/** How much of the window each half hour used, oldest first; future buckets are null. */
+/**
+ * How much of the window each half hour used, oldest first. Future buckets,
+ * and past ones from before the first reading, are null: use that came before
+ * the mod was watching is unknown, so the first reading is the baseline.
+ */
 export function buckets(log: RadarLog, now: number): (number | null)[] {
   const reset = Date.parse(log.resetsAt)
   const start = Number.isNaN(reset) ? now - FIVE_HOURS : reset - FIVE_HOURS
+  const first = log.samples[0]
   const out: (number | null)[] = []
-  let before = 0
+  let before = first ? first.pct : 0
   for (let i = 0; i < BUCKETS; i++) {
     const from = start + i * BUCKET
-    if (from > now) {
+    if (from > now || !first || from + BUCKET <= first.t) {
       out.push(null)
       continue
     }

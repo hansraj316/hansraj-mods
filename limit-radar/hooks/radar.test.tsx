@@ -60,12 +60,15 @@ test('the model: samples, burn per half hour, forecast, month', () => {
   expect(f?.isBeforeReset).toBe(true)
   expect(span((f?.limitAt ?? 0) - (T0 + 40 * MIN))).toBe('1h 00m')
 
-  // The window opened at 18:00: buckets 4 and 5 (20:00 to 21:00) hold this hour's use.
+  // The window opened at 18:00 and the first reading (40%) came at 20:00: it is the
+  // baseline, so 18:00 to 20:00 is unknown and 20:00 to 20:30 shows only the 12 points seen.
   const b = buckets(log, T0 + 40 * MIN)
   expect(b.length).toBe(10)
-  expect(b[4]).toBe(52)
+  expect(b.slice(0, 4)).toEqual([null, null, null, null])
+  expect(b[4]).toBe(12)
   expect(b[5]).toBe(12)
   expect(b[9]).toBe(null)
+  expect(buckets(emptyLog(), T0)).toEqual(Array(10).fill(null))
 
   // A new resetsAt starts a new window.
   expect(addSample(log, { kind: 'five_hour', percentUsed: 3, resetsAt: '2026-11-03T04:00:00Z' }, T0 + 4 * 60 * MIN).samples.length).toBe(1)

@@ -16,6 +16,18 @@
     {
       "name": "tokentide",
       "source": "./tokentide"
+    },
+    {
+      "name": "gearbox",
+      "source": "./gearbox"
+    },
+    {
+      "name": "limit-radar",
+      "source": "./limit-radar"
+    },
+    {
+      "name": "waypoints",
+      "source": "./waypoints"
     }
   ]
 }

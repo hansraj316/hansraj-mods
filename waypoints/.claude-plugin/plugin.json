@@ -1,0 +1,13 @@
+{
+  "name": "waypoints",
+  "displayName": "Waypoints",
+  "version": "0.1.0",
+  "description": "Pin the reply where a decision landed, then fork a new line of work from that point with a handoff written for you. A map pane shows your pins and forks.",
+  "author": {
+    "name": "hansraj"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/waypoints",
+  "repository": "https://github.com/hansraj316/hansraj-mods",
+  "types": "./types/index.d.ts"
+}

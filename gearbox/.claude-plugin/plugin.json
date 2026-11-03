@@ -1,0 +1,97 @@
+{
+  "name": "gearbox",
+  "displayName": "Gearbox",
+  "version": "0.1.0",
+  "description": "Model and effort presets as one row of chips above the prompt, set to your own taste, with a nudge toward a lighter preset for small tasks.",
+  "author": {
+    "name": "hansraj"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/gearbox",
+  "repository": "https://github.com/hansraj316/hansraj-mods",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "gear1Model": {
+      "type": "string",
+      "title": "Preset 1: model",
+      "description": "The model preset 1 uses.",
+      "default": "opus",
+      "options": [
+        "opus",
+        "sonnet",
+        "haiku"
+      ]
+    },
+    "gear1Effort": {
+      "type": "string",
+      "title": "Preset 1: effort",
+      "description": "How hard preset 1 asks the model to think.",
+      "default": "high",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gear2Model": {
+      "type": "string",
+      "title": "Preset 2: model",
+      "description": "The model preset 2 uses.",
+      "default": "sonnet",
+      "options": [
+        "opus",
+        "sonnet",
+        "haiku"
+      ]
+    },
+    "gear2Effort": {
+      "type": "string",
+      "title": "Preset 2: effort",
+      "description": "How hard preset 2 asks the model to think.",
+      "default": "medium",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "gear3Model": {
+      "type": "string",
+      "title": "Preset 3: model",
+      "description": "The model preset 3 uses.",
+      "default": "haiku",
+      "options": [
+        "opus",
+        "sonnet",
+        "haiku"
+      ]
+    },
+    "gear3Effort": {
+      "type": "string",
+      "title": "Preset 3: effort",
+      "description": "How hard preset 3 asks the model to think.",
+      "default": "low",
+      "options": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    "nudge": {
+      "type": "string",
+      "title": "Suggest a lighter preset",
+      "description": "When the draft looks like a small task, offer a lighter preset above the prompt.",
+      "default": "on",
+      "options": [
+        "on",
+        "off"
+      ]
+    }
+  }
+}

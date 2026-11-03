@@ -1,0 +1,21 @@
+{
+  "name": "limit-radar",
+  "displayName": "Limit Radar",
+  "version": "0.1.0",
+  "description": "Your 5-hour, weekly and monthly usage in one pane, with a forecast of when you'll hit the 5-hour limit at your current pace and a heads-up when that comes before the reset.",
+  "author": {
+    "name": "hansraj"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/hansraj316/hansraj-mods/tree/main/limit-radar",
+  "repository": "https://github.com/hansraj316/hansraj-mods",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "bandAt": {
+      "type": "number",
+      "title": "Show the band from (%)",
+      "description": "Show the line above the prompt once the 5-hour window passes this percentage. It also shows whenever the forecast lands before the reset.",
+      "default": 50
+    }
+  }
+}
